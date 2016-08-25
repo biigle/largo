@@ -18,6 +18,6 @@ class AteModuleListenersImagesCleanupListenerTest extends TestCase
     {
         $image = ImageTest::create();
         $this->expectsJobs(RemoveAnnotationPatches::class);
-        with(new ImagesCleanupListener)->handle([$image->id]);
+        with(new ImagesCleanupListener)->handle([$image->uuid]);
     }
 }
