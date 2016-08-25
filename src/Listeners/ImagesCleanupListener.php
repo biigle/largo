@@ -2,10 +2,10 @@
 
 namespace Dias\Modules\Ate\Listeners;
 
-use Illuminate\Foundation\Bus\DispatchesJobs;
-use Dias\Modules\Ate\Jobs\RemoveAnnotationPatches;
 use Dias\Image;
 use Dias\Annotation;
+use Illuminate\Foundation\Bus\DispatchesJobs;
+use Dias\Modules\Ate\Jobs\RemoveAnnotationPatches;
 
 class ImagesCleanupListener
 {
