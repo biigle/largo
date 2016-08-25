@@ -282,7 +282,7 @@ class AteController extends Controller
 
         // create new 'changed' annotation labels
         $newAnnotationLabels = [];
-        $now = new \Carbon\Carbon;
+        $now = \Carbon\Carbon::now();
 
         // Get all labels that are already there exactly like they should be created
         // in the next step.
