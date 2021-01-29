@@ -53,7 +53,7 @@ jobs:
     - name: Install current repository
       run: |
         composer config repositories.module --json '{"type": "path", "url": "'${GITHUB_WORKSPACE}'", "options": {"symlink": false}}'
-        composer require --no-ansi --no-interaction --no-scripts --ignore-platform-reqs ${GITHUB_REPOSITORY}
+        composer require --no-ansi --no-interaction --no-scripts --ignore-platform-reqs --with-all-dependencies ${GITHUB_REPOSITORY}
         sed -i "/Insert Biigle module service providers/i Biigle\\\\Modules\\\\${MODULE_NAME}\\\\${MODULE_NAME}ServiceProvider::class," config/app.php
         ln -sf ../../../vendor/${GITHUB_REPOSITORY}/tests tests/php/Modules/${MODULE_NAME}
       working-directory: ../core
