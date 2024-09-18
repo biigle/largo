@@ -387,15 +387,35 @@ export default {
             this.sortingDirection = direction;
         },
         fetchSortingSequence(key, labelId) {
+            // Check if the sorting sequence is cached for the label and key
+            const sequence = this.sortingSequenceCache?.[labelId]?.[key];
+            if (sequence) {
+                return Vue.Promise.resolve(sequence);
+            }
             let promise;
-            if (key === SORT_KEY.OUTLIER) {
+            if (!this.selectedLabel) {
+                // No label selected, return an empty array
+                promise = Vue.Promise.resolve([]);
+            } else if (key === SORT_KEY.OUTLIER) {
+                // Handle outlier sorting
                 promise = this.querySortByOutlier(labelId)
+                .then(response => response.body);
+            } else if (key === SORT_KEY.SIMILARITY) {
+                // Handle similarity sorting
+                if (this.similarityReference && this.similarityReference.length === 1) {
+                    // If there is only one annotation, return it directly
+                    promise = Vue.Promise.resolve([this.similarityReference[0]]);
+                } else {
+                    // Skip cacheing for this sorting method and query the backend
+                    promise = this.querySortBySimilarity(labelId, this.similarityReference)
                     .then(response => response.body);
+                }
             } else {
+                // Fall through to the else case and return an empty array
                 promise = Vue.Promise.resolve([]);
             }
-
-            return promise.then(ids => this.putSortingSequenceToCache(key, labelId, ids));
+            // Cache the sorting sequence and return the promise
+            return promise.then(ids => this.putSortingSequenceToCache(key, labelId, ids))
         },
         putSortingSequenceToCache(key, labelId, sequence) {
             if (!this.sortingSequenceCache[labelId]) {
