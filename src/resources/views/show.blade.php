@@ -12,6 +12,8 @@
         biigle.$declare('largo.showImageAnnotationRoute', '{{ route('show-image-annotation', '') }}/');
         biigle.$declare('largo.showVideoAnnotationRoute', '{{ route('show-video-annotation', '') }}/');
         biigle.$declare('largo.patchUrlTemplate', '{{$patchUrlTemplate}}');
+        biigle.$declare('largo.thumbnailWidth', {{config('thumbnails.width')}});
+        biigle.$declare('largo.thumbnailHeight', {{config('thumbnails.height')}});
     </script>
 @endpush
 

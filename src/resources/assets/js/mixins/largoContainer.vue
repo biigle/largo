@@ -51,6 +51,9 @@ export default {
             needsSimilarityReference: false,
             similarityReference: null,
             pinnedImage: null,
+            width: 0,
+            height: 0,
+            margin: 8,
         };
     },
     provide() {
@@ -488,7 +491,11 @@ export default {
     },
     created() {
         this.user = biigle.$require('largo.user');
-
+        
+        // Enlarge thumbnail to present image in full size
+        this.width = biigle.$require('largo.thumbnailWidth') + this.margin;
+        this.height = biigle.$require('largo.thumbnailHeight') + this.margin;
+        
         window.addEventListener('beforeunload', (e) => {
             if (this.hasDismissedAnnotations) {
                 e.preventDefault();
