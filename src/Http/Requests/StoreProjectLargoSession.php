@@ -120,10 +120,17 @@ class StoreProjectLargoSession extends StoreLargoSession
      */
     protected function getAffectedImageVolumes($annotations)
     {
-        return ImageAnnotation::join('images', 'image_annotations.image_id', '=', 'images.id')
-            ->whereIn('image_annotations.id', $annotations)
-            ->distinct()
-            ->pluck('images.volume_id');
+        $chunkedI = array_chunk($annotations,config('biigle.db_param_limit')-1);
+        $volumeIdsI = [];
+        foreach($chunkedI as $ci){
+            $chunkVolIdI = ImageAnnotation::join('images', 'image_annotations.image_id', '=', 'images.id')
+                ->whereIn('image_annotations.id', $ci)
+                ->distinct()
+                ->pluck('images.volume_id')
+                ->toArray();
+            $volumeIdsI = array_merge($volumeIdsI, $chunkVolIdI);
+        }
+        return array_unique($volumeIdsI);
     }
 
     /**
@@ -136,9 +143,16 @@ class StoreProjectLargoSession extends StoreLargoSession
      */
     protected function getAffectedVideoVolumes($annotations)
     {
-        return VideoAnnotation::join('videos', 'video_annotations.video_id', '=', 'videos.id')
-            ->whereIn('video_annotations.id', $annotations)
-            ->distinct()
-            ->pluck('videos.volume_id');
+        $chunkedV = array_chunk($annotations,config('biigle.db_param_limit')-1);
+        $volumeIdsV = [];
+        foreach($chunkedV as $cv){
+            $chunkVolIdV = VideoAnnotation::join('videos', 'video_annotations.video_id', '=', 'videos.id')
+                ->whereIn('video_annotations.id', $cv)
+                ->distinct()
+                ->pluck('videos.volume_id')
+                ->toArray();
+            $volumeIdsV = array_merge($volumeIdsV, $chunkVolIdV);
+        }
+        return array_unique($volumeIdsV);
     }
 }
