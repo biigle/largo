@@ -3,7 +3,9 @@
 namespace Biigle\Modules\Largo\Http\Controllers\Views\Volumes;
 
 use Biigle\Http\Controllers\Views\Controller;
+use Biigle\ImageAnnotationLabel;
 use Biigle\LabelTree;
+use Biigle\MediaType;
 use Biigle\Project;
 use Biigle\Role;
 use Biigle\Volume;
@@ -23,6 +25,7 @@ class LargoController extends Controller
     public function index(Request $request, $id)
     {
         $volume = Volume::findOrFail($id);
+
         if (!$request->user()->can('sudo')) {
             $this->authorize('edit-in', $volume);
         }
@@ -53,12 +56,38 @@ class LargoController extends Controller
         $patchUrlTemplate = Storage::disk(config('largo.patch_storage_disk'))
             ->url(':prefix/:id.'.config('largo.patch_format'));
 
+        $shapes = [
+            1 => 'Point',
+            2 => 'LineString',
+            3 => 'Polygon',
+            4 => 'Circle',
+            5 => 'Rectangle',
+            6 => 'Ellipse',
+        ];
+
+        if ($volume->media_type_id == MediaType::videoId()){
+            $shapes[7] = 'WholeFrame';
+        }
+
+        $shapes = collect($shapes);
+
+        $usersWithAnnotations = ImageAnnotationLabel::query()
+            ->join('image_annotations', 'image_annotations.id', '=', 'image_annotation_labels.annotation_id')
+            ->join('images', 'image_annotations.image_id', '=', 'images.id')
+            ->where('images.volume_id', $id)
+            ->join('users', 'image_annotation_labels.user_id', '=', 'users.id')
+            ->distinct('image_annotation_labels.user_id')
+            ->select('image_annotation_labels.user_id', 'users.lastname', 'users.firstname')
+            ->get();
+
         return view('largo::show', [
             'volume' => $volume,
             'projects' => $projects,
             'labelTrees' => $labelTrees,
             'target' => $volume,
             'patchUrlTemplate' => $patchUrlTemplate,
+            'shapes' => $shapes,
+            'usersWithAnnotations' => $usersWithAnnotations,
         ]);
     }
 }

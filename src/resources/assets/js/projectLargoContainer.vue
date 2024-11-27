@@ -15,10 +15,17 @@ export default {
         };
     },
     methods: {
-        queryAnnotations(label) {
-            let imagePromise = ProjectsApi.queryImageAnnotations({id: this.projectId, label_id: label.id});
-            let videoPromise = ProjectsApi.queryVideoAnnotations({id: this.projectId, label_id: label.id});
-
+        queryAnnotations(label, filters) {
+            let imagePromise = ProjectsApi.queryImageAnnotations({
+                id: this.projectId,
+                label_id: label.id,
+                ...filters,
+            });
+            let videoPromise = ProjectsApi.queryVideoAnnotations({
+                id: this.projectId,
+                label_id: label.id,
+                ...filters,
+            });
             return Vue.Promise.all([imagePromise, videoPromise]);
         },
         performSave(payload) {
