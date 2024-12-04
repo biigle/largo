@@ -3,9 +3,14 @@
 namespace Biigle\Tests\Modules\Largo\Http\Controllers\Api\Projects;
 
 use ApiTestCase;
-use Biigle\Tests\ImageAnnotationLabelTest;
-use Biigle\Tests\ImageAnnotationTest;
 use Biigle\Tests\ImageTest;
+use Biigle\Tests\LabelTest;
+use Biigle\Tests\VolumeTest;
+use Biigle\Tests\ProjectTest;
+use Illuminate\Testing\TestResponse;
+use Biigle\Tests\ImageAnnotationTest;
+use Biigle\Tests\ImageAnnotationLabelTest;
+use Symfony\Component\HttpFoundation\Response;
 
 class FilterImageAnnotationsByLabelControllerTest extends ApiTestCase
 {
@@ -73,5 +78,118 @@ class FilterImageAnnotationsByLabelControllerTest extends ApiTestCase
         $this->get("/api/v1/projects/{$id}/image-annotations/filter/label/{$l1->label_id}")
             ->assertStatus(200)
             ->assertExactJson([$a1->id => $image->uuid]);
+    }
+
+    public function testGetProjectsAnnotationLabels()
+    {
+        $v1 = VolumeTest::create();
+        $img1 = ImageTest::create(['volume_id' => $v1->id]);
+        $a1 = ImageAnnotationTest::create(['image_id' => $img1]);
+        $l1 = LabelTest::create();
+        ImageAnnotationLabelTest::create(['annotation_id' => $a1->id, 'label_id' => $l1->id]);
+
+
+        $v2 = VolumeTest::create();
+        $img2 = ImageTest::create(['volume_id' => $v2->id]);
+        $a2 = ImageAnnotationTest::create(['image_id' => $img2->id]);
+        $l2 = LabelTest::create();
+        ImageAnnotationLabelTest::create(['annotation_id' => $a2->id, 'label_id' => $l2->id]);
+
+        $this->project()->volumes()->attach([$v1->id, $v2->id]);
+        $pid = $this->project()->id;
+
+        $this->doTestApiRoute('GET', "/api/v1/projects/{$pid}/image-annotations/");
+
+        $this->beUser();
+        $this->getJson("/api/v1/projects/{$pid}/image-annotations/")
+            ->assertStatus(403);
+
+        $this->beEditor();
+        $response = $this->getJson("/api/v1/projects/{$pid}/image-annotations/")->assertStatus(200);
+
+        ob_start();
+        $response->sendContent();
+        $content = ob_get_clean();
+        $response = new TestResponse(
+            new Response(
+                $content,
+                $response->baseResponse->getStatusCode(),
+                $response->baseResponse->headers->all()
+            )
+        );
+
+        $response->assertJsonFragment([
+                'uuid' => $img1->uuid,
+                'annotation_id' => $a1->id,
+                'label_id' => $l1->id,
+                'label_tree_id' => $l1->label_tree_id
+            ])
+            ->assertJsonFragment([
+                'uuid' => $img2->uuid,
+                'annotation_id' => $a2->id,
+                'label_id' => $l2->id,
+                'label_tree_id' => $l2->label_tree_id
+            ]);
+
+        $this->assertCount(2, json_decode($response->getContent()));
+    }
+
+    public function testGetEmptyProjectsAnnotationLabels()
+    {
+        $pid = $this->project()->id;
+
+        $this->doTestApiRoute('GET', "/api/v1/projects/{$pid}/image-annotations/");
+
+        $this->beUser();
+        $this->getJson("/api/v1/projects/{$pid}/image-annotations/")
+            ->assertStatus(403);
+
+        $this->beEditor();
+        $response = $this->getJson("/api/v1/projects/{$pid}/image-annotations/")->assertStatus(200);
+
+        ob_start();
+        $response->sendContent();
+        $content = ob_get_clean();
+        $response = new TestResponse(
+            new Response(
+                $content,
+                $response->baseResponse->getStatusCode(),
+                $response->baseResponse->headers->all()
+            )
+        );
+
+        $this->assertEmpty(json_decode($response->getContent()));
+    }
+
+    public function testGetProjectsWithoutAnnotationsAnnotationLabels()
+    {
+        $project = ProjectTest::create();
+        $v1 = VolumeTest::create();
+        ImageTest::create(['volume_id' => $v1->id]);
+
+        $project->volumes()->attach($v1->id);
+        $pid = $this->project()->id;
+
+        $this->doTestApiRoute('GET', "/api/v1/projects/{$pid}/image-annotations/");
+
+        $this->beUser();
+        $this->getJson("/api/v1/projects/{$pid}/image-annotations/")
+            ->assertStatus(403);
+
+        $this->beEditor();
+        $response = $this->getJson("/api/v1/projects/{$pid}/image-annotations/")->assertStatus(200);
+
+        ob_start();
+        $response->sendContent();
+        $content = ob_get_clean();
+        $response = new TestResponse(
+            new Response(
+                $content,
+                $response->baseResponse->getStatusCode(),
+                $response->baseResponse->headers->all()
+            )
+        );
+
+        $this->assertEmpty(json_decode($response->getContent()));
     }
 }

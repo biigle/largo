@@ -1,0 +1,63 @@
+<template>
+    <li class="annotations-tab-item" :class="classObject" :title="title">
+        <div class="annotations-tab-item__title" @click="emitSelectLabel">
+            <span class="pull-right badge" v-text="count" :title="countTitle"></span>
+            <span class="annotations-tab-item__color" :style="colorStyle"></span>
+            <span v-text="labelItem.name"></span>
+        </div>
+    </li>
+</template>
+
+<script>
+
+export default {
+    props: {
+        label: {
+            type: Object,
+            default() {
+                return {};
+            },
+        },
+        count: {
+            type: Number,
+            default() {
+                return 0;
+            },
+        },
+    },
+    data() {
+        return {
+            labelItem: {}
+        }
+    },
+    computed: {
+        title() {
+            return `Annotations with label ${this.labelItem.name}`;
+        },
+        classObject() {
+            return {
+                selected: this.labelItem.selected,
+            };
+        },
+        countTitle() {
+            return `There are ${this.count} annotations with label ${this.labelItem.name}`;
+        },
+        colorStyle() {
+            return 'background-color: #' + this.labelItem.color;
+        },
+    },
+    methods: {
+        emitSelectLabel() {
+            this.labelItem.selected = !this.labelItem.selected
+            if (this.labelItem.selected) {
+                this.$emit('select', this.labelItem)
+            } else {
+                this.$emit('deselect');
+            }
+        }
+    },
+    created() {
+        this.labelItem = this.label;
+    }
+};
+</script>

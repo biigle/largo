@@ -3,11 +3,15 @@
 namespace Biigle\Tests\Modules\Largo\Http\Controllers\Api\Volumes;
 
 use ApiTestCase;
+use Carbon\Carbon;
+use Biigle\Tests\LabelTest;
+use Biigle\Tests\VideoTest;
+use Biigle\Tests\ProjectTest;
+use Illuminate\Testing\TestResponse;
+use Biigle\Tests\VideoAnnotationTest;
 use Biigle\Tests\AnnotationSessionTest;
 use Biigle\Tests\VideoAnnotationLabelTest;
-use Biigle\Tests\VideoAnnotationTest;
-use Biigle\Tests\VideoTest;
-use Carbon\Carbon;
+use Symfony\Component\HttpFoundation\Response;
 
 class FilterVideoAnnotationsByLabelControllerTest extends ApiTestCase
 {
@@ -187,5 +191,86 @@ class FilterVideoAnnotationsByLabelControllerTest extends ApiTestCase
         $this->get("/api/v1/volumes/{$id}/video-annotations/filter/label/{$l1->label_id}")
             ->assertStatus(200)
             ->assertExactJson([$a1->id => $video->uuid]);
+    }
+
+    public function testGetVolumeAnnotationLabels()
+    {
+        $id = $this->volume()->id;
+        $project = ProjectTest::create();
+        $v1 = VideoTest::create(['volume_id' => $id, 'filename' => 'abc.jpg']);
+        $v2 = VideoTest::create(['volume_id' => $id, 'filename' => 'def.jpg']);
+        $a1 = VideoAnnotationTest::create(['video_id' => $v1]);
+        $a2 = VideoAnnotationTest::create(['video_id' => $v2->id]);
+        $l1 = LabelTest::create();
+        $l2 = LabelTest::create();
+        VideoAnnotationLabelTest::create(['annotation_id' => $a1->id, 'label_id' => $l1->id]);
+        VideoAnnotationLabelTest::create(['annotation_id' => $a2->id, 'label_id' => $l2->id]);
+
+        $project->volumes()->attach($id);
+
+        $this->doTestApiRoute('GET', "/api/v1/volume/{$id}/video-annotations");
+
+        $this->beUser();
+        $this->getJson("/api/v1/volume/{$id}/video-annotations")
+            ->assertStatus(403);
+
+        $this->beEditor();
+        $response = $this->getJson("/api/v1/volume/{$id}/video-annotations")->assertStatus(200);
+
+        ob_start();
+        $response->sendContent();
+        $content = ob_get_clean();
+        $response = new TestResponse(
+            new Response(
+                $content,
+                $response->baseResponse->getStatusCode(),
+                $response->baseResponse->headers->all()
+            )
+        );
+
+        $response->assertJsonFragment([
+            'uuid' => $v1->uuid,
+            'annotation_id' => $a1->id,
+            'label_id' => $l1->id,
+            'label_tree_id' => $l1->label_tree_id
+        ])
+        ->assertJsonFragment([
+            'uuid' => $v2->uuid,
+            'annotation_id' => $a2->id,
+            'label_id' => $l2->id,
+            'label_tree_id' => $l2->label_tree_id
+        ]);
+
+        $this->assertCount(2, json_decode($response->getContent()));
+    }
+
+    public function testGetVolumeWithoutAnnotationsAnnotationLabels()
+    {
+        $id = $this->volume()->id;
+        $project = ProjectTest::create();
+        VideoTest::create(['volume_id' => $this->volume()->id]);
+        $project->volumes()->attach($id);
+
+        $this->doTestApiRoute('GET', "/api/v1/volume/{$id}/video-annotations");
+
+        $this->beUser();
+        $this->getJson("/api/v1/volume/{$id}/video-annotations")
+            ->assertStatus(403);
+
+        $this->beEditor();
+        $response = $this->getJson("/api/v1/volume/{$id}/video-annotations")->assertStatus(200);
+
+        ob_start();
+        $response->sendContent();
+        $content = ob_get_clean();
+        $response = new TestResponse(
+            new Response(
+                $content,
+                $response->baseResponse->getStatusCode(),
+                $response->baseResponse->headers->all()
+            )
+        );
+
+        $this->assertEmpty(json_decode($response->getContent()));
     }
 }

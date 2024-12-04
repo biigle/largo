@@ -53,6 +53,14 @@ $router->group([
         'uses' => 'Projects\FilterVideoAnnotationsByLabelController@index',
     ]);
 
+    $router->get('projects/{id}/image-annotations', [
+        'uses' => 'Projects\FilterImageAnnotationsByLabelController@getProjectsAnnotationLabels',
+    ]);
+
+    $router->get('projects/{id}/video-annotations', [
+        'uses' => 'Projects\FilterVideoAnnotationsByLabelController@getProjectsAnnotationLabels',
+    ]);
+
     $router->get('volumes/{id}/annotations/sort/outliers/{id2}', [
         'uses' => 'Volumes\SortAnnotationsByOutliersController@index',
     ]);
@@ -75,5 +83,13 @@ $router->group([
 
     $router->get('volumes/{id}/video-annotations/filter/label/{id2}', [
         'uses' => 'Volumes\FilterVideoAnnotationsByLabelController@index',
+    ]);
+
+    $router->get('volume/{id}/image-annotations', [
+        'uses' => 'Volumes\FilterImageAnnotationsByLabelController@getVolumeAnnotationLabels'
+    ]);
+
+    $router->get('volume/{id}/video-annotations', [
+        'uses' => 'Volumes\FilterVideoAnnotationsByLabelController@getVolumeAnnotationLabels'
     ]);
 });

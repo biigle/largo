@@ -13,7 +13,9 @@ import {Messages} from '../import';
 import {PowerToggle} from '../import';
 import {SidebarTab} from '../import';
 import {Sidebar} from '../import';
+import AnnotationsTab from '../components/annotationsTab.vue';
 import {SORT_DIRECTION, SORT_KEY} from '../components/sortingTab';
+import AnnotationsApi from '../api/labels';
 
 /**
  * Mixin for largo view models
@@ -29,6 +31,7 @@ export default {
         relabelImageGrid: RelabelImageGrid,
         settingsTab: SettingsTab,
         sortingTab: SortingTab,
+        annotationsTab: AnnotationsTab,
     },
     data() {
         return {
@@ -51,6 +54,11 @@ export default {
             needsSimilarityReference: false,
             similarityReference: null,
             pinnedImage: null,
+            annotationLabels: {},
+            volumeId: 0,
+            fetchedAllAnnotations: false,
+            changedAnnotations: {},
+            labelTreesIndex: {},
         };
     },
     provide() {
@@ -204,6 +212,7 @@ export default {
             annotations = annotations.sort((a, b) => b.id - a.id);
 
             Vue.set(this.annotationsCache, label.id, annotations);
+            
         },
         initAnnotations(label, annotations, type) {
             return Object.keys(annotations)
@@ -269,6 +278,27 @@ export default {
                 }
             }
         },
+        getChangedAnnotations() {
+            let changedAnnotations = {};
+
+            this.dismissedAnnotations.forEach((a) => {
+                changedAnnotations[a.id] = { oldLabelId: a.label_id, newLabelId: null };
+            })
+            this.annotationsWithNewLabel.forEach((a) => {
+                changedAnnotations[a.id] = { oldLabelId: a.label_id, newLabelId: a.newLabel.id };
+                // Add new label to annotation tab
+                if (!this.annotationLabels.hasOwnProperty(a.newLabel.id)) {
+                    this.annotationLabels[a.newLabel.id] = {
+                        id: a.newLabel.id,
+                        label: a.newLabel,
+                        count: 0
+                    }
+                }
+
+            })
+
+            return changedAnnotations;
+        },
         save() {
             if (this.loading) {
                 return
@@ -294,7 +324,10 @@ export default {
                     force: this.forceChange,
                 })
                 .then(
-                    response => this.waitForSessionId = response.body.id,
+                    (response) => {
+                        this.waitForSessionId = response.body.id;
+                        this.changedAnnotations = this.getChangedAnnotations();
+                    },
                     (response) => {
                         this.finishLoading();
                         handleErrorResponse(response);
@@ -469,6 +502,92 @@ export default {
             return this.updateSortKey(SORT_KEY.ANNOTATION_ID)
                 .then(() => this.sortingDirection = SORT_DIRECTION.DESCENDING);
         },
+        handleOpenTab(tab) {
+            if (tab === "annotations" && !this.fetchedAllAnnotations) {
+                this.fetchAllAnnotations();
+            }
+        },
+        fetchAllAnnotations() {
+            this.startLoading();
+            Promise.all([
+                AnnotationsApi.fetchImageVolumeAnnotations({ id: this.volumeId }),
+                AnnotationsApi.fetchVideoVolumeAnnotations({ id: this.volumeId })
+            ])
+                .then(this.parseResponse)
+                .then((res) => {
+                    this.addLabelsToAnnotationsTab(res[0]);
+                    this.addAnnotationsToCache(res[1]);
+                })
+                .catch(handleErrorResponse)
+                .finally(this.finishLoading);
+        },
+        parseResponse(responses) {
+            let res = responses[0].body.length != 0 ? responses[0] : responses[1];
+            let type = responses[0].body.length != 0 ? IMAGE_ANNOTATION : VIDEO_ANNOTATION;
+            let groupedAnnotations = {};
+            let uniqueKeys = new Set();
+            let labels = {};
+            res.body.forEach((al) => {
+                // Save annotations to use them in labels tab
+                groupedAnnotations = this.groupAnnotationsByLabel(al, type, groupedAnnotations);
+                labels, uniqueKeys = this.createAnnotationTabItems(al, labels, uniqueKeys);
+            })
+            // Save all video and image annotation labels for project largo view            
+            return [labels, groupedAnnotations];
+        },
+        createAnnotationTabItems(al, labels, uniqueKeys) {
+            let labelId = al.label_id;
+            // Make sure each annotation is added only once for each label item.
+            // This is important if the annotation has the same label attached by
+            // multiple users.
+            let uniqueKey = al.annotation_id + '-' + labelId;
+            if (!uniqueKeys.has(uniqueKey)) {
+                if (labels.hasOwnProperty(labelId)) {
+                    labels[labelId].count += 1;
+                } else {
+                    uniqueKeys.add(uniqueKey);
+                    let tIdx = this.labelTreesIndex[al.label_tree_id].index;
+                    let lIdx = this.labelTreesIndex[al.label_tree_id].labelIndex[labelId];
+                    let label = this.labelTrees[tIdx].labels[lIdx];
+                    labels[labelId] = {
+                        id: labelId,
+                        label: label,
+                        count: 1,
+                    };
+                }
+            }
+            return labels, uniqueKeys;
+        },
+        groupAnnotationsByLabel(al, type, groupedAnnotation) {
+            let labelId = al.label_id;
+            let annotation = {
+                id: al.annotation_id,
+                uuid: al.uuid,
+                label_id: al.label_id,
+                dismissed: false,
+                newLabel: null,
+                type: type
+            };
+            if (groupedAnnotation.hasOwnProperty(labelId)) {
+                groupedAnnotation[labelId].push(annotation);
+            } else {
+                groupedAnnotation[labelId] = [annotation];
+            }
+            return groupedAnnotation;
+        },
+        addAnnotationsToCache(groupedAnnotation) {
+            Object.keys(groupedAnnotation).map((id) => {
+                // Show the newest annotations (with highest ID) first.
+                let annotations = groupedAnnotation[id];
+                annotations = annotations.sort((a, b) => b.id - a.id);
+                Vue.set(this.annotationsCache, id, annotations);
+            });
+
+            this.fetchedAllAnnotations = true;
+        },
+        addLabelsToAnnotationsTab(labels) {
+            this.annotationLabels = labels;
+        }
     },
     watch: {
         annotations(annotations) {
@@ -480,14 +599,27 @@ export default {
         step(step) {
             Events.$emit('step', step);
         },
-        selectedLabel() {
+        selectedLabel(_, oldLabel) {
             if (this.isInDismissStep) {
                 this.$refs.dismissGrid.setOffset(0);
             }
+            if (oldLabel?.selected) {
+                oldLabel.selected = false;
+            }
         },
+        labelTrees() {
+            this.labelTrees.forEach((t, idx) => {
+                let labelIndex = {};
+                t.labels.forEach((l, idx) => {
+                    labelIndex[l.id] = idx;
+                });
+                this.labelTreesIndex[t.id] = { index: idx, labelIndex: labelIndex };
+            })
+        }
     },
     created() {
         this.user = biigle.$require('largo.user');
+        this.volumeId = biigle.$require('largo.volumeId');
 
         window.addEventListener('beforeunload', (e) => {
             if (this.hasDismissedAnnotations) {

@@ -2,10 +2,12 @@
 
 namespace Biigle\Modules\Largo\Http\Controllers\Api\Volumes;
 
-use Biigle\Http\Controllers\Api\Controller;
-use Biigle\ImageAnnotation;
+use Generator;
 use Biigle\Volume;
+use Biigle\ImageAnnotation;
 use Illuminate\Http\Request;
+use Biigle\Http\Controllers\Api\Controller;
+use Symfony\Component\HttpFoundation\StreamedJsonResponse;
 
 class FilterImageAnnotationsByLabelController extends Controller
 {
@@ -57,5 +59,56 @@ class FilterImageAnnotationsByLabelController extends Controller
             ->distinct()
             ->orderBy('image_annotations.id', 'desc')
             ->pluck('images.uuid', 'image_annotations.id');
+    }
+
+        /**
+     * Get all image annotations with uuids for a given volume
+     * 
+     * @api {get} 
+     * @apiGroup Volumes
+     * @apiName test
+     * @apiParam {Number} id The Volume ID
+     * @apiPermission user
+     * @apiDescription Returns a stream containing the image uuids and ids of annotations, labels and label trees
+     * 
+     * @apiSuccessExample {json} Success response:
+     * [{
+	 * 	"uuid":"9198ea9c-ef97-4af7-8018-407d16eafb65",
+	 * 	"annotation_id":41,
+	 *	"label_id":14,
+	 *	"label_tree_id":123
+	 * }]
+     *
+     * @param int $id Volume ID
+     * @return \Symfony\Component\HttpFoundation\StreamedJsonResponse
+     */
+    public function getVolumeAnnotationLabels($id)
+    {
+        $volume = Volume::findOrFail($id);
+        $this->authorize('access', $volume);
+
+        $annotations = $volume->images()
+        ->join('image_annotations', 'images.id', '=', 'image_annotations.image_id')
+        ->join('image_annotation_labels', 'image_annotations.id', '=', 'image_annotation_labels.annotation_id')
+        ->join('labels', 'image_annotation_labels.label_id', '=', 'labels.id')
+        ->select(
+            'images.uuid',
+            'image_annotations.id as annotation_id',
+            'image_annotation_labels.label_id',
+            'labels.label_tree_id'
+        );
+
+        $res = function () use ($annotations): Generator {
+            foreach ($annotations->lazy() as $a) {
+                yield [
+                    'uuid' => $a->uuid,
+                    'annotation_id' => $a->annotation_id,
+                    'label_id' => $a->label_id,
+                    'label_tree_id' => $a->label_tree_id
+                ];
+            }
+        };
+
+        return new StreamedJsonResponse($res());
     }
 }
