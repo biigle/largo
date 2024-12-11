@@ -49,12 +49,19 @@
         width: calc(100% - 4px);
         height: calc(100% - 4px);
     }
+
+    .image-buttons-bottom {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+    }
 }
 
 .image-grid__image--catalog {
     > a {
         width: 100%;
     }
+    @extend .image-grid__image--largo
 }
 
 .image-grid__image--relabel {
