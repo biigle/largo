@@ -395,28 +395,31 @@ export default {
         updateSortDirection(direction) {
             this.sortingDirection = direction;
         },
-        fetchSortingSequence(key, labelId) {
-            const sequence = this.sortingSequenceCache?.[labelId]?.[key];
-            if (sequence) {
-                return Vue.Promise.resolve(sequence);
-            }
+fetchSortingSequence(key, labelId) {
+    const sequence = this.sortingSequenceCache?.[labelId]?.[key];
+    if (sequence) {
+        return Vue.Promise.resolve(sequence);
+    }
 
-            let promise;
-            if (!this.selectedLabel) {
-                promise = Vue.Promise.resolve([]);
-            } else if (key === SORT_KEY.OUTLIER) {
-                promise = this.querySortByOutlier(labelId)
-                    .then(response => response.body);
-            } else if (key === SORT_KEY.SIMILARITY) {
-                // Skip cacheing for this sorting method.
-                return this.querySortBySimilarity(labelId, this.similarityReference)
-                    .then(response => response.body);
-            } else {
-                promise = Vue.Promise.resolve([]);
-            }
+    let promise;
+    if (!this.selectedLabel) {
+        promise = Vue.Promise.resolve([]);
+    } else if (key === SORT_KEY.OUTLIER) {
+        promise = this.querySortByOutlier(labelId)
+            .then(response => response.body);
+    } else if (key === SORT_KEY.SIMILARITY) {
+        if (this.similarityReference && this.similarityReference.length === 1) {
+            promise = Vue.Promise.resolve([this.similarityReference[0]]);
+        } else {
+            promise = this.querySortBySimilarity(labelId, this.similarityReference)
+                .then(response => response.body);
+        }
+    } else {
+        promise = Vue.Promise.resolve([]);
+    }
+    return promise.then(ids => this.putSortingSequenceToCache(key, labelId, ids));
+},
 
-            return promise.then(ids => this.putSortingSequenceToCache(key, labelId, ids));
-        },
         putSortingSequenceToCache(key, labelId, sequence) {
             if (!this.sortingSequenceCache[labelId]) {
                 Vue.set(this.sortingSequenceCache, labelId, {});
