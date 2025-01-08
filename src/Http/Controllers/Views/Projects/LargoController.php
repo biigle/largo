@@ -3,7 +3,9 @@
 namespace Biigle\Modules\Largo\Http\Controllers\Views\Projects;
 
 use Biigle\Http\Controllers\Views\Controller;
+use Biigle\ImageAnnotationLabel;
 use Biigle\Project;
+use Biigle\Shape;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Storage;
@@ -36,11 +38,14 @@ class LargoController extends Controller
         $patchUrlTemplate = Storage::disk(config('largo.patch_storage_disk'))
             ->url(':prefix/:id.'.config('largo.patch_format'));
 
+        $shapes = Shape::pluck('name', 'id');
+
         return view('largo::project', [
             'project' => $project,
             'labelTrees' => $labelTrees,
             'target' => $project,
             'patchUrlTemplate' => $patchUrlTemplate,
+            'shapes' => $shapes,
         ]);
     }
 }

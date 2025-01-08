@@ -15,15 +15,16 @@ export default {
         };
     },
     methods: {
-        queryAnnotations(label) {
+        queryAnnotations(label, filters) {
             let imagePromise;
             let videoPromise;
-            if (this.mediaType === 'image') {
-                imagePromise = VolumesApi.queryImageAnnotations({id: this.volumeId, label_id: label.id});
+            let params = { ...filters, id: this.volumeId, label_id: label.id };
+            if (this.mediaType === "image") {
+                imagePromise = VolumesApi.queryImageAnnotations(params);
                 videoPromise = Vue.Promise.resolve([]);
             } else {
                 imagePromise = Vue.Promise.resolve([]);
-                videoPromise = VolumesApi.queryVideoAnnotations({id: this.volumeId, label_id: label.id});
+                videoPromise = VolumesApi.queryVideoAnnotations(params);
             }
 
             return Vue.Promise.all([imagePromise, videoPromise]);
@@ -49,8 +50,9 @@ export default {
             }
 
             return response;
-        }
+        },
     },
+
     created() {
         this.volumeId = biigle.$require('largo.volumeId');
         this.labelTrees = biigle.$require('largo.labelTrees');

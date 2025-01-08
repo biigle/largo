@@ -16,12 +16,12 @@
     justify-content: center;
     align-items: center;
     pointer-events: none;
-    transition: .25s background-color ease;
+    transition: 0.25s background-color ease;
     z-index: 2;
 
     &.block {
         pointer-events: auto;
-        background-color: rgba(0, 0, 0, .5);
+        background-color: rgba(0, 0, 0, 0.5);
     }
 }
 
@@ -61,7 +61,7 @@
     > a {
         width: 100%;
     }
-    @extend .image-grid__image--largo
+    @extend .image-grid__image--largo;
 }
 
 .image-grid__image--relabel {
@@ -70,7 +70,7 @@
         width: 100%;
         left: 0;
         bottom: 0;
-        padding: .5em;
+        padding: 0.5em;
         overflow-x: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -105,11 +105,15 @@
         image-orientation: none;
 
         &:not(:last-child) {
-            margin-right: .5em;
+            margin-right: 0.5em;
         }
     }
 
     .alert {
         margin-bottom: 0;
     }
+}
+
+.annotation-filter {
+    min-width: 90%;
 }
