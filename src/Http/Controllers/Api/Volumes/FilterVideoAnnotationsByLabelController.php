@@ -30,8 +30,11 @@ class FilterVideoAnnotationsByLabelController extends Controller
     {
         $volume = Volume::findOrFail($vid);
         $this->authorize('access', $volume);
-        $this->validate($request, ['take' => 'integer']);
+        $this->validate($request, ['take' => 'integer', 'shape_id' => 'array', 'user_id' => 'array', 'union' => 'integer']);
         $take = $request->input('take');
+        $shape_ids = $request->input('shape_id');
+        $user_ids = $request->input('user_id');
+        $union = $request->input('union', 0);
 
         $session = $volume->getActiveAnnotationSession($request->user());
 
@@ -45,6 +48,13 @@ class FilterVideoAnnotationsByLabelController extends Controller
             ->join('videos', 'video_annotations.video_id', '=', 'videos.id')
             ->where('videos.volume_id', $vid)
             ->where('video_annotation_labels.label_id', $lid)
+            ->when(!is_null($shape_ids), function ($query) use ($shape_ids, $union) {
+                $this->compileFilterConditions($query, $union, $shape_ids, 'shape_id');
+            }
+            )
+            ->when(!is_null($user_ids), function ($query) use ($user_ids, $union) {
+                $this->compileFilterConditions($query, $union, $user_ids, 'user_id');
+            })
             ->when($session, function ($query) use ($session, $request) {
                 if ($session->hide_other_users_annotations) {
                     $query->where('video_annotation_labels.user_id', $request->user()->id);
@@ -57,5 +67,34 @@ class FilterVideoAnnotationsByLabelController extends Controller
             ->distinct()
             ->orderBy('video_annotations.id', 'desc')
             ->pluck('videos.uuid', 'video_annotations.id');
+    }
+    private function compileFilterConditions(&$query, $union, $filters, $filterName)
+    {
+        if ($union){
+            $included = [];
+            $excluded = [];
+            foreach ($filters as &$filterValue){
+                if ($filterValue < 0) {
+                    array_push($excluded, intval(abs($filterValue)));
+                } else {
+                    array_push($included, intval($filterValue));
+                }}
+                $query->where(function($query) use ($included, $excluded, $filterName) {
+                    if (count($included)){
+                        $query->whereIn($filterName, $included, 'or');
+                    }
+                    if (count($excluded)){
+                        $query->whereNotIn($filterName, $excluded, 'or');
+                    }
+                });
+        } else {
+            foreach ($filters as &$filterValue){
+                if ($filterValue < 0) {
+                    $query->whereNot($filterName, intval(abs($filterValue)));
+                } else {
+                    $query->where($filterName, intval($filterValue));
+                }
+            }
+        }
     }
 }

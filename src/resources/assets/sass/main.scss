@@ -105,7 +105,7 @@
         image-orientation: none;
 
         &:not(:last-child) {
-            margin-right: .5em;
+            margin-right: 0.5em;
         }
     }
 
@@ -113,3 +113,12 @@
         margin-bottom: 0;
     }
 }
+
+.annotation-filter {
+    min-width: 90%;
+}
+
+.largo-filter-select {
+    width: 50%;
+}
+
