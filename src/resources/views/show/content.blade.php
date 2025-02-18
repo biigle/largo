@@ -31,7 +31,7 @@
             Please choose a label in the sidebar.
         </div>
         <div v-cloak v-if="isInDismissStep && hasNoAnnotations" class="text-info">
-            There are no annotations with the label <strong v-text="selectedLabel.name"></strong>.
+            There are no annotations with the label <strong v-text="selectedLabel.name"></strong><span v-if="hasActiveFilters"> and the selected filters</span>.
         </div>
     </div>
 </div>
@@ -68,6 +68,9 @@
             v-on:cancel-similarity="handleCancelSimilaritySort"
             ></sorting-tab>
     </sidebar-tab>
+<sidebar-tab :highlight="hasActiveFilters" v-on:disabled="isInRelabelStep" name="filtering" icon="exchange-alt fa-filter fa-solid" title="Filter">
+        <filtering-tab v-on:handle-selected-filters="handleSelectedFilters"></filtering-tab>
+</sidebar-tab>
     <sidebar-tab name="settings" icon="cog" title="Settings">
         <settings-tab
             v-on:change-outlines="updateShowOutlines"

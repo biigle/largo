@@ -1,8 +1,8 @@
 <script>
 import DismissImageGrid from '../components/dismissImageGrid';
-import RelabelImageGrid from '../components/relabelImageGrid';
-import SettingsTab from '../components/settingsTab';
+import RelabelImageGrid from '../components/relabelImageGrid'; import SettingsTab from '../components/settingsTab';
 import SortingTab from '../components/sortingTab';
+import FilteringTab from '../components/filteringTab';
 import {Echo} from '../import';
 import {Events} from '../import';
 import {handleErrorResponse} from '../import';
@@ -30,6 +30,7 @@ export default {
         relabelImageGrid: RelabelImageGrid,
         settingsTab: SettingsTab,
         sortingTab: SortingTab,
+        filteringTab: FilteringTab,
         labelList: LabelList,
     },
     data() {
@@ -53,7 +54,11 @@ export default {
             needsSimilarityReference: false,
             similarityReference: null,
             pinnedImage: null,
+            selectedFilters: [],
+            hasActiveFilters: false,
+            union: 0,
             labels: [],
+            filtersCache: {},
             fetchedLabelCount: false,
         };
     },
@@ -76,12 +81,26 @@ export default {
             return this.step === 1;
         },
         annotations() {
-            if (this.selectedLabel && this.annotationsCache.hasOwnProperty(this.selectedLabel.id)) {
-                return this.annotationsCache[this.selectedLabel.id];
+            if (!this.selectedLabel) {
+                return [];
+            }
+
+            let cacheKey = JSON.stringify({ label: this.selectedLabel.id });
+
+            if (this.annotationsCache.hasOwnProperty(cacheKey)) {
+                let annotations = this.annotationsCache[cacheKey];
+                let filtersCacheKey = JSON.stringify({...this.selectedFilters, label: this.selectedLabel.id, union: this.union})
+
+                if (this.hasActiveFilters && this.filtersCache.hasOwnProperty(filtersCacheKey)) {
+                    annotations = annotations.filter(annotation => this.filtersCache[filtersCacheKey].includes(annotation.id));
+                }
+
+                return annotations
             }
 
             return [];
         },
+
         sortedAnnotations() {
             let annotations = this.annotations;
 
@@ -96,8 +115,9 @@ export default {
                     // 'v' to avoid duplicate IDs whe sorting both types of annotations.
                     map[a.type === VIDEO_ANNOTATION ? ('v' + a.id) : ('i' + a.id)] = a;
                 });
-
-                annotations = this.sortingSequence.map(id => map[id]);
+                annotations = this.sortingSequence
+                   .map(id => map[id])
+                   .filter(id => id !== undefined);
             }
 
             if (this.sortingDirection === SORT_DIRECTION.ASCENDING) {
@@ -118,7 +138,7 @@ export default {
             return annotations;
         },
         hasNoAnnotations() {
-            return this.selectedLabel && !this.loading && this.annotations.length === 0;
+            return this.selectedLabel && !this.loading && this.sortedAnnotations.length === 0;
         },
         dismissedAnnotations() {
             return this.allAnnotations.filter(item => item.dismissed);
@@ -176,15 +196,42 @@ export default {
         }
     },
     methods: {
+        compileFilters(filters, union) {
+            let parameters = [];
+
+            filters.forEach(
+                (filter) => {
+                    //If we have an union in the current filter, we need to execute the last request
+                    if (!parameters[filter.filter]) {
+                        parameters[filter.filter] = [];
+                    }
+                    parameters[filter.filter].push(filter.value);
+                }
+            )
+            parameters['union'] = union;
+            return parameters
+        },
         getAnnotations(label) {
             let promise1;
             let promise2;
 
-            if (!this.annotationsCache.hasOwnProperty(label.id)) {
-                Vue.set(this.annotationsCache, label.id, []);
+            let cacheKey = JSON.stringify({label: label.id});
+
+            //store in variables to avoid race conditions
+            let union = this.union;
+            let selectedFilters = this.selectedFilters;
+
+            if (!this.annotationsCache.hasOwnProperty(cacheKey)) {
+                Vue.set(this.annotationsCache, cacheKey, []);
                 this.startLoading();
                 promise1 = this.queryAnnotations(label)
-                    .then((response) => this.gotAnnotations(label, response), handleErrorResponse)
+                    .then(
+                        (response) => this.gotAnnotations(label, response),
+                        handleErrorResponse
+                    )
+                    .then(a => Vue.set(this.annotationsCache, cacheKey, a))
+                    .then(this.loadFilters(label, selectedFilters, union))
+                    .finally(this.finishLoading);
             } else {
                 promise1 = Vue.Promise.resolve();
             }
@@ -201,12 +248,12 @@ export default {
 
             Vue.Promise.all([promise1, promise2]).finally(this.finishLoading);
         },
+
+
         gotAnnotations(label, response) {
+
             let imageAnnotations = response[0].data;
             let videoAnnotations = response[1].data;
-
-            // This is the object that we will use to store information for each
-            // annotation patch.
             let annotations = [];
 
             if (imageAnnotations) {
@@ -216,11 +263,47 @@ export default {
             if (videoAnnotations) {
                 annotations = annotations.concat(this.initAnnotations(label, videoAnnotations, VIDEO_ANNOTATION));
             }
+
             // Show the newest annotations (with highest ID) first.
             annotations = annotations.sort((a, b) => b.id - a.id);
 
-            Vue.set(this.annotationsCache, label.id, annotations);
+            return annotations
         },
+        handleSelectedFilters(filters, union) {
+            union = union ? 1 : 0;
+            this.union = union ;
+            if (Object.keys(filters).length > 0) {
+                this.hasActiveFilters = true
+            } else {
+                this.hasActiveFilters = false
+            }
+            this.selectedFilters = filters;
+            if (!this.selectedLabel){
+                return []
+            }
+            this.loadFilters(this.selectedLabel.id, filters, union)
+        },
+
+        loadFilters(label, filters, union) {
+            if (filters.length == 0){
+                return
+            }
+            let cacheKey = JSON.stringify({...filters, label: label, union: union});
+            if (!this.filtersCache.hasOwnProperty(cacheKey)) {
+                Vue.set(this.annotationsCache, cacheKey, []);
+                let requestParams = this.compileFilters(filters, union);
+                this.startLoading();
+                this.queryAnnotations(this.selectedLabel, requestParams)
+                    .then(
+                        (response) => this.gotAnnotations(label, response),
+                        handleErrorResponse
+                    )
+                    .then(a => a.map(ann => ann.id))
+                    .then(a => Vue.set(this.filtersCache, cacheKey, a))
+                    .finally(this.finishLoading);
+            }
+        },
+
         initAnnotations(label, annotations, type) {
             return Object.keys(annotations)
                 .map(function (id) {
@@ -238,7 +321,7 @@ export default {
             this.selectedLabel = label;
 
             if (this.isInDismissStep) {
-                this.getAnnotations(label);
+                this.getAnnotations(label, this.selectedFilters, this.union);
             }
         },
         handleDeselectedLabel() {
@@ -265,7 +348,7 @@ export default {
             this.step = 0;
             this.lastSelectedImage = null;
             if (this.selectedLabel) {
-                this.getAnnotations(this.selectedLabel);
+                this.getAnnotations(this.selectedLabel, this.selectedFilters, this.union);
             }
         },
         handleSelectedImageRelabel(image, event) {
