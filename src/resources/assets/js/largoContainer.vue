@@ -1,6 +1,6 @@
 <script>
-import LargoContainer from './mixins/largoContainer';
-import VolumesApi from './api/volumes';
+import LargoContainer from './mixins/largoContainer.vue';
+import VolumesApi from './api/volumes.js';
 
 /**
  * View model for the main Largo container
@@ -20,13 +20,13 @@ export default {
             let videoPromise;
             if (this.mediaType === 'image') {
                 imagePromise = VolumesApi.queryImageAnnotations({id: this.volumeId, label_id: label.id});
-                videoPromise = Vue.Promise.resolve([]);
+                videoPromise = Promise.resolve([]);
             } else {
-                imagePromise = Vue.Promise.resolve([]);
+                imagePromise = Promise.resolve([]);
                 videoPromise = VolumesApi.queryVideoAnnotations({id: this.volumeId, label_id: label.id});
             }
 
-            return Vue.Promise.all([imagePromise, videoPromise]);
+            return Promise.all([imagePromise, videoPromise]);
         },
         performSave(payload) {
             return VolumesApi.save({id: this.volumeId}, payload);
