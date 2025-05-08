@@ -1,5 +1,7 @@
 # BIIGLE Largo Module
 
+⚠️ This module has been [merged](https://github.com/biigle/core/pull/1148) into biigle/core.
+
 [![Test status](https://github.com/biigle/largo/workflows/Tests/badge.svg)](https://github.com/biigle/largo/actions?query=workflow%3ATests)
 
 This is the BIIGLE module to review image annotations in a regular grid.
